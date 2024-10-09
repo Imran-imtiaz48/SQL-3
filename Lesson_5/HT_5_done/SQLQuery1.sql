@@ -1,252 +1,256 @@
-/*1. Написать представление, в котором необходимо
-вывести перечень магазинов с указанием их места
-расположения. При этом название страны следует
-вывести на английском языке и в сокращенном виде
-(например, United States – US).*/
-create view View_5_1  (Country,ShopName)
-as
-select 'Country' = case c.CountryName
-	when 'Украина' then 'Ukraine -UA'
-	when 'Грузия' then 'Georgia - GR'
-	when 'Россия' then 'Russia - RU'
-	when 'Беларусь' then 'Belarus - BE'	
-	when 'Казахстан' then 'Kazakhstan - KZ'	
-	end,
-	sh.ShopName
-from [Shop]sh join [Country] c on sh.CountryId=c.Id
-go
+/* 1. Create a view to display country names with corresponding shop names. */
+CREATE VIEW View_5_1 (Country, ShopName) AS
+SELECT 
+    CASE c.CountryName
+        WHEN 'Г“ГЄГ°Г ГЁГ­Г ' THEN 'Ukraine - UA'
+        WHEN 'ГѓГ°ГіГ§ГЁГї' THEN 'Georgia - GR'
+        WHEN 'ГђГ®Г±Г±ГЁГї' THEN 'Russia - RU'
+        WHEN 'ГЃГҐГ«Г Г°ГіГ±Гј' THEN 'Belarus - BE'
+        WHEN 'ГЉГ Г§Г ГµГ±ГІГ Г­' THEN 'Kazakhstan - KZ'
+        ELSE 'Unknown Country' -- Fallback for any unmatched cases
+    END AS Country,
+    sh.ShopName
+FROM 
+    [Shop] sh 
+JOIN 
+    [Country] c ON sh.CountryId = c.Id;
+GO
 
-select * from  view_5_1
-group by Country,ShopName
-go
+SELECT * FROM View_5_1;
+GO
 
+/* 2. Update the circulation of books based on their publication year. */
+DECLARE @value INT;
 
+SELECT @value = CASE 
+    WHEN YEAR(b.DateOfPubl) > 2017 THEN 1000 
+    ELSE 100 
+END
+FROM [Books] b;
 
-/*2. Написать запрос, который изменяет данные в табли-
-це Books следующим образом: если книги были из-
-даны после 2008 года, тогда их тираж увеличить на
-1000 екзмпляров, иначе тираж увеличить на 100 ед.
-Примечание! Воспользоваться инструкцией CASE.*/
+UPDATE [Books]
+SET Circulation = Circulation + @value;
+GO
 
+SELECT b.BookName, b.DateOfPubl, b.Circulation
+FROM [Books] b;
+GO
 
+/* 3. Create a Common Table Expression (CTE) to summarize sales. */
+WITH Virtual(ShopName, SaleCount, DateOfSal) AS (
+    SELECT 
+        sh.ShopName, 
+        SUM(s.SaleCount) AS SaleCount,
+        MAX(s.DateOfSal) AS DateOfSal
+    FROM 
+        [Shop] sh 
+    JOIN 
+        [Sales] s ON s.Id = sh.SalesId
+    GROUP BY 
+        sh.ShopName 
+)
+SELECT * FROM Virtual;
+GO
 
-declare @value int;
-select  @value = case
-	when YEAR(b.DateOfPubl)>2017 then 1000
-	when YEAR(b.DateOfPubl)<=2017 then 100								
-	end
-from [Books]b
-update books
-set Сirculation = Сirculation+@value
-go
+/* 4. Create a stored procedure to list shops with sales greater than 0. */
+CREATE PROCEDURE Less5_task_4 AS
+BEGIN
+    SELECT 
+        sh.ShopName, 
+        s.SaleCount, 
+        c.CountryName
+    FROM 
+        [Sales] s 
+    JOIN 
+        [Shop] sh ON s.Id = sh.SalesId
+    JOIN 
+        [Country] c ON sh.CountryId = c.Id
+    WHERE 
+        s.SaleCount > 0;
+END;
+GO
 
+EXEC Less5_task_4;
+GO
 
-select b.BookName, b.DateOfPubl,b.Сirculation
-from [Books]b
-go
+/* 5. Create a stored procedure to find books by a specific author. */
+CREATE PROCEDURE Less5_task_5_1  
+    @authorName NVARCHAR(100), 
+    @authorSurName NVARCHAR(100)
+AS
+BEGIN
+    SELECT 
+        CONCAT(a.AuthorSurName, ' ', a.AuthorName) AS Author, 
+        b.BookName AS Book
+    FROM 
+        [Author] a 
+    JOIN 
+        [Books] b ON a.Id = b.AuthorId
+    WHERE 
+        a.AuthorName = @authorName 
+        AND a.AuthorSurName = @authorSurName;
+END;
+GO
 
+DECLARE @authorName NVARCHAR(100) = 'Г‚Г«Г Г¤ГЁГ¬ГЁГ°';
+DECLARE @authorSurName NVARCHAR(100) = 'ГЏГ®Г±ГҐГ«ГїГЈГЁГ­';
 
-/*3. Написать виртуальное представление, которое выводит общее количество продаж и
- дату последней реализации для каждого магазина.*/
+EXEC Less5_task_5_1 @authorName, @authorSurName;
+GO
 
+/* 6. Create a stored procedure to find the maximum of two integers. */
+CREATE PROCEDURE MaxAB
+    @a INT,
+    @b INT
+AS
+BEGIN
+    DECLARE @max INT = @a;
+    IF @b > @max 
+        SET @max = @b;
 
- WITH Virtual(ShopName, SaleCount, DateOfSal) AS
- (select sh.ShopName, sum(s.SaleCount),max (s.DateOfSal)
- from [Shop] sh join [Sales]s on s.Id=sh.SalesId
- Group by sh.ShopName 
- )
- select *
- from Virtual
- go
+    RETURN @max; -- Return the maximum value
+END;
+GO
 
- /*
- 4. Создать хранимую процедуру, которая выводит на экран список магазинов, которые продали 
- хотя бы одну книгу Вашего издательства. Указать также месторасположение (страну) магазина. 
- */
+DECLARE @res INT;
+EXEC @res = MaxAB 5, 25;
+SELECT 'Max from 5 and 25 is ', @res;
+GO
 
- create procedure Less5_task_4
-as
- select sh.ShopName, s.SaleCount, c.CountryName
- From [Sales]s join [Shop]sh on s.Id=sh.SalesId
- join [Country] c on sh.CountryId=c.Id
- where s.SaleCount>0
- go
+/* 7. Create a view for books sorted by genre and price. */
+CREATE VIEW View_7 (JanreName, BookName, Price) AS
+SELECT 
+    j.JanreName, 
+    b.BookName, 
+    b.Price
+FROM 
+    [Books] b 
+JOIN 
+    [Janre] j ON b.JanreId = j.Id;
+GO
 
- exec Less5_task_4
- go
+/*  Create a procedure to fetch books by genre with sorting option. */
+CREATE PROCEDURE BooksByJanre 
+    @janreName NVARCHAR(100),
+    @sort INT
+AS
+BEGIN
+    IF @sort = 0
+        SELECT * FROM View_7 
+        WHERE JanreName = @janreName
+        ORDER BY Price ASC;
+    ELSE IF @sort = 1
+        SELECT * FROM View_7 
+        WHERE JanreName = @janreName
+        ORDER BY Price DESC;
+    ELSE
+        SELECT * FROM View_7 
+        WHERE JanreName = @janreName; 
+END;
+GO
 
- /*5. Написать процедуру, позволяющую просмотреть все книги определенного автора,
-  при этом его имя передается при вызове */
-  
-  create procedure Less5_task_5_1  
-  @authorName nvarchar(100) , 
-  @authorSurName nvarchar(100)
-as
-select a.AuthorSurName+ ' ' + a.AuthorName as 'Author', b.BookName as 'Book'
-from [Author] a join [Books] b on a.Id=b.AuthorId
-where a.AuthorName=@authorName and a.AuthorSurName=@authorSurName
-go
+EXEC BooksByJanre 'Г”ГЅГ­ГІГҐГ§ГЁ', 2;
+GO
 
-declare @authorName nvarchar(100) ,   @authorSurName nvarchar(100)
-set @authorName = 'Владимир'
-set  @authorSurName = 'Поселягин'
+/* 8. Create a procedure to find the author with the highest circulation. */
+CREATE PROCEDURE MaxResAuthor AS
+BEGIN
+    SELECT TOP 1 
+        CONCAT(a.AuthorSurName, ' ', a.AuthorName, ' ', a.AuthorSecName) AS Author
+    FROM 
+        [Books] b 
+    JOIN 
+        [Author] a ON b.AuthorId = a.Id
+    GROUP BY 
+        CONCAT(a.AuthorSurName, ' ', a.AuthorName, ' ', a.AuthorSecName)
+    ORDER BY 
+        MAX(b.Circulation) DESC;
+END;
+GO
 
-exec Less5_task_5_1 @authorName, @authorSurName
-go
+EXEC MaxResAuthor;
+GO
 
-/*6. Создать хранимую процедуру, которая возвращает максимальное из двух чисел.*/
-create proc maxAB
-@a int,
-@b int
-as
-declare @max int
-set @max=@a
-if @max<@b 
-	set @max=@b
-return @max
-go
+/* 9. Create a procedure to calculate the factorial of a number. */
+CREATE PROCEDURE Factorial
+    @a INT
+AS
+BEGIN
+    DECLARE @p INT = 1;
+    DECLARE @i INT = 1;
 
-declare @res int
-exec @res=maxAB 5,25
-select 'max from 5 and 25 is ', @res
-go
+    WHILE @i <= @a
+    BEGIN
+        SET @p *= @i;
+        SET @i += 1;
+    END
+    RETURN @p; -- Return the factorial value
+END;
+GO
 
-/*7. Написать процедуру, которая выводит на экран книги и цены по указанной тематике. 
-При этом необходимо указывать направление сортировки: 0 – по цене, по росту, 
-1 – по убыванию, любое другое – без сортировки.*/
+DECLARE @res INT;
+EXEC @res = Factorial 3;
+SELECT '3! is ', @res;
+GO
 
-create view View_7  (JanreName,BookName, Price)
-as
-select j.JanreName, b.BookName, b.Price
-from [Books] b join [Janre] j on b.JanreId=j.Id
-go
+/* 10. Create a procedure to update publication dates of books. */
+SELECT * 
+INTO #TMP_10
+FROM [Books];
+GO
 
-create proc BooksByJanre 
-@janreName nvarchar(100) ,
-@sort int
-as
-if @sort=0
-	begin
-	 select * from view_7 
-	 where JanreName=@janreName
-	 order by Price
-	end
-else
-	if @sort=1
-		begin
-			select * from view_7 
-			where JanreName=@janreName
-			order by Price desc
-		end
-	else
-		begin
-			select * from view_7 
-			where JanreName=@janreName			
-		end
-go
-		
-exec BooksByJanre 'Фэнтези',2
-go 
+CREATE PROCEDURE UpdateTMP_10
+    @tamplatBookName NVARCHAR(100)
+AS
+BEGIN
+    UPDATE #TMP_10
+    SET DateOfPubl = DATEADD(YEAR, 2, DateOfPubl)  
+    WHERE BookName LIKE @tamplatBookName + '%';
+END;
+GO
 
-/*8. Написать процедуру, которая возвращает полное имя 
-автора, книг которого больше всех было издано. */
+EXEC UpdateTMP_10 'Гџ';
+GO
 
-create proc MaxResAuthor
-as
-select tmp.Author
-from (select top 1 a.AuthorSurName+' '+a.AuthorName+' '+a.AuthorSecName as 'Author', max(b.Сirculation) as 'Circulation'
-from [Books] b join [Author]a on b.AuthorId=a.Id
-group by  a.AuthorSurName+' '+a.AuthorName+' '+a.AuthorSecName
-order by 2 desc) as tmp
-go
+SELECT 
+    tmp.BookName, 
+    tmp.DateOfPubl AS 'Date'
+FROM 
+    #TMP_10 tmp
+ORDER BY 
+    tmp.Date;
+GO
 
-exec  MaxResAuthor
-go
+/* 11. Create a procedure to update circulation and prices for books published within a date range. */
+SELECT * 
+INTO #TMP_11
+FROM [Books];
+GO
 
-/*9. Написать процедуру для расчета факториала числа. */
+CREATE PROCEDURE UpdateTMP_11
+    @min DATE,
+    @max DATE
+AS
+BEGIN
+    UPDATE #TMP_11
+    SET 
+        Circulation = Circulation * 2, 
+        Price = Price * 1.2
+    WHERE 
+        DateOfPubl BETWEEN @min AND @max;
+END;
+GO
 
+EXEC UpdateTMP_11 '2016-02-15', '2018-03-16';
+GO
 
-create proc Factorial
-@a int
-as
-declare @p int, @i int
-set @p=1
-set @i=1
-while @i<=@a
-	begin
-		set @p*=@i;
-		set @i+=1;
-	end
-return @p
-go
-
-
-declare @res int
-exec @res=Factorial 3
-select '3! is ', @res
-go
-
-/*10.Написать хранимую процедуру, которая позволяет увеличить дату издательства каждой книги, 
-которая соответствует шаблону на 2 года. Шаблон передается в качестве параметра в процедуру.*/
-
-Select * 
-into #TMP_10
-from [Books]
-go
-
-
-create proc UpdateTMP_10
-@tamplatBookName nvarchar(100)
-
-as
-UPDATE [#TMP_10]
-SET DateOfPubl=DATEADD(year, 2, DateOfPubl)  
-WHERE BookName LIKE @tamplatBookName+'%'
-go
-
-exec UpdateTMP_10 'Я'
-go
-
-
-select tmp.BookName, tmp.DateOfPubl  as 'Date'
-from [#tmp_10] tmp
-order by 2
-go
-
-
-
-
-
-
-/*11.Написать хранимую процедуру с параметрами, определяющими диапазон дат выпуска книг. 
-Процедура позволяет обновить данные о тираже выпуска книг
-по следующим условиям: 
-• Если дата выпуска книги находится в определенном диапазоне, тогда тираж нужно увеличить 
-	в два раза, а цену за единицу увеличить на 20%;
-• Если дата выпуска книги не входит в диапазон, тогда тираж оставить без изменений.
-
-Предусмотреть вывод на экран соответствующих сообщений об ошибке, если передаваемые даты одинаковые, или 
-конечная дата промежутка меньше начала, или же начальная больше текущей даты.
-*/
-Select * 
-into #TMP_11
-from [Books]
-go
-
-
-create proc UpdateTMP_11
-@min date,
-@max date
-as
-UPDATE [#TMP_11]
-SET Сirculation =Сirculation  * 2, Price=Price*1.2
-WHERE DateOfPubl between @min and @max
-go
-
-exec UpdateTMP_11 '2016-02-15','2018-03-16'
-go
-
-select tmp.BookName, tmp.DateOfPubl, tmp.Price, tmp.Сirculation
-from [#tmp_11] tmp
-order by 2
-go
+SELECT 
+    tmp.BookName, 
+    tmp.DateOfPubl, 
+    tmp.Price, 
+    tmp.Circulation
+FROM 
+    #TMP_11 tmp
+ORDER BY 
+    tmp.DateOfPubl;
+GO
